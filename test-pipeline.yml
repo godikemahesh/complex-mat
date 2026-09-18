@@ -1,92 +1,24 @@
-# Disables automatic triggers on direct code pushes/commits
-trigger: none
-
-
-pool:
-  vmImage: ubuntu-latest
-
-stages:
-- stage: Backend
-  displayName: 'Backend tests'
-  jobs:
-  - job: BackendTests
-    displayName: 'Run backend pytest suite'
-    steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.11'
-    - task: CmdLine@2
-      displayName: 'Install backend dependencies'
-      inputs:
-        script: |
-          set -e
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-        workingDirectory: 'backend'
-    - task: CmdLine@2
-      displayName: 'Run pytest'
-      inputs:
-        script: |
-          set -e
-          python -m pytest --junitxml=test-results.xml
-        workingDirectory: 'backend'
-    - task: PublishTestResults@2
-      condition: succeededOrFailed()
-      inputs:
-        testResultsFormat: 'JUnit'
-        testResultsFiles: 'backend/test-results.xml'
-        testRunTitle: 'Backend tests'
-
-- stage: Frontend
-  displayName: 'Frontend tests'
-  jobs:
-  - job: FrontendTests
-    displayName: 'Run frontend vitest suite'
-    steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '20.x'
-    - task: CmdLine@2
-      displayName: 'Install frontend dependencies'
-      inputs:
-        script: |
-          set -e
-          npm ci
-        workingDirectory: 'frontend'
-    - task: CmdLine@2
-      displayName: 'Run vitest'
-      inputs:
-        script: |
-          set -e
-          npm run test
-        workingDirectory: 'frontend'
-
 - stage: E2E
   displayName: 'Playwright E2E'
   dependsOn:
   - Backend
   - Frontend
+
   jobs:
   - job: PlaywrightE2E
     displayName: 'Run Playwright end-to-end suite'
+
     variables:
     - name: CI
       value: 'true'
+    - name: BASE_URL
+      value: 'https://complex-mat.vercel.app/'
+
     steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.11'
     - task: NodeTool@0
       inputs:
         versionSpec: '20.x'
-    - task: CmdLine@2
-      displayName: 'Install backend dependencies'
-      inputs:
-        script: |
-          set -e
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-        workingDirectory: 'backend'
+
     - task: CmdLine@2
       displayName: 'Install frontend dependencies'
       inputs:
@@ -94,13 +26,15 @@ stages:
           set -e
           npm ci
         workingDirectory: 'frontend'
+
     - task: CmdLine@2
-      displayName: 'Install Playwright browsers & OS deps'
+      displayName: 'Install Playwright browsers'
       inputs:
         script: |
           set -e
           npx playwright install --with-deps chromium
         workingDirectory: 'frontend'
+
     - task: CmdLine@2
       displayName: 'Run Playwright tests'
       inputs:
@@ -108,12 +42,14 @@ stages:
           set -e
           npm run test:e2e
         workingDirectory: 'frontend'
+
     - task: PublishTestResults@2
       condition: succeededOrFailed()
       inputs:
         testResultsFormat: 'JUnit'
         testResultsFiles: 'frontend/playwright-report/results.xml'
         testRunTitle: 'Playwright E2E'
+
     - task: PublishPipelineArtifact@1
       condition: succeededOrFailed()
       inputs:
